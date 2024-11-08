@@ -1,0 +1,45 @@
+Components and Pins
+
+1. For IR Sensors:- 
+   - IR Sensor 1 (for Slot 1): Connect OUT to Arduino D2.
+   - IR Sensor 2 (for Slot 2): Connect OUT to Arduino D3.
+   - IR Sensor 3 (for Slot 3): Connect OUT to Arduino D4.
+   - IR Sensor 4 (for Slot 4): Connect OUT to Arduino D5.
+   - Power for IR Sensors*:
+     - Connect the *VCC* pins of all IR sensors to 5V on the Arduino.
+     - Connect the *GND* pins of all IR sensors to GND on the Arduino.
+
+2.For RFID Reader (MFRC522)
+   - Connect SDA (SS) to Arduino D10.
+   - Connect SCK to Arduino D13.
+   - Connect MOSI to Arduino D11.
+   - Connect MISO to Arduino D12.
+   - Connect RST to Arduino D9.
+   - Connect GND to GND on the Arduino.
+   - Connect 3.3V on the RFID reader to the 3.3V pin on the Arduino Uno.
+
+3. For I2C LCD (16x2)
+   - SDA to A4 on Arduino Uno.
+   - SCL to A5 on Arduino Uno.
+   - VCC to 5V on Arduino.
+   - GND to GND on Arduino.
+
+For Power Supply Notes
+- The Arduino Uno’s 5V pin can be used to power the IR sensors and LCD.
+- The 3.3V pin on the Arduino is used to power the RFID reader.
+  
+Connection Diagram
+
+Here is the wiring summary:
+- D2: IR Sensor 1 OUT.
+- D3: IR Sensor 2 OUT.
+- D4: IR Sensor 3 OUT.
+- D5: IR Sensor 4 OUT.
+- D10: RFID SDA (SS).
+- D9: RFID RST.
+- D11: RFID MOSI.
+- D12: RFID MISO.
+- D13: RFID SCK.
+- A4: LCD SDA.
+- A5: LCD SCL.
+
