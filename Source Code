@@ -1,0 +1,197 @@
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Define the pins for the 4 IR sensors on the Arduino Uno
+const int irSensorPin1 = 2;
+const int irSensorPin2 = 3;
+const int irSensorPin3 = 4;
+const int irSensorPin4 = 5;
+
+// RFID pins
+#define SS_PIN 10
+#define RST_PIN 9
+MFRC522 rfid(SS_PIN, RST_PIN);
+
+// LCD address and setup
+#define LCD_ADDRESS 0x27  // Change to 0x3F if 0x27 doesn't work
+#define LCD_COLUMNS 16
+#define LCD_ROWS 2
+LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
+
+// Maximum number of vehicles
+#define MAX_VEHICLES 6
+
+// Structure for vehicle information
+struct Vehicle {
+  byte uid[4];
+  String vehicleNumber;
+};
+
+// List of registered vehicles
+Vehicle vehicles[MAX_VEHICLES] = {
+    {{0xCC, 0xFD, 0x82, 0x21}, "TN 66 AK 7557"},
+    {{0xAA, 0xDB, 0xAD, 0x7A}, "TN 37 EV 4111"},
+    {{0x8B, 0x99, 0x8B, 0x72}, "TN 30 DF 0850"},
+    {{0x8B, 0x92, 0xC4, 0x72}, "TN 38 Q 1234"},
+    {{0x23, 0x87, 0x5E, 0x38}, "TN 41 L 5775"},
+    {{0x2D, 0x69, 0x8C, 0x39}, "TN 36 AD 4000"}
+};
+
+// Variables to store the states of each sensor
+int irSensorState1 = 0;
+int irSensorState2 = 0;
+int irSensorState3 = 0;
+int irSensorState4 = 0;
+
+// Array to store parking slot occupancy and which vehicle occupies each slot
+bool slotOccupied[4] = {false, false, false, false};
+String parkedVehicles[4] = {"", "", "", ""};
+
+void setup() {
+  // Start serial communication
+  Serial.begin(9600);
+  
+  // Initialize RFID
+  SPI.begin();
+  rfid.PCD_Init();
+
+  // Initialize LCD
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Parking System");
+
+  // Set the IR sensor pins as input
+  pinMode(irSensorPin1, INPUT);
+  pinMode(irSensorPin2, INPUT);
+  pinMode(irSensorPin3, INPUT);
+  pinMode(irSensorPin4, INPUT);
+
+  delay(2000);
+  lcd.clear();
+}
+
+// Function to scroll text on the LCD's first row
+void scrollText(String message, int row) {
+  int length = message.length();
+  if (length <= LCD_COLUMNS) {
+    lcd.setCursor(0, row);
+    lcd.print(message);
+  } else {
+    for (int i = 0; i < length - LCD_COLUMNS + 1; i++) {
+      lcd.setCursor(0, row);
+      lcd.print(message.substring(i, i + LCD_COLUMNS));
+      delay(300);
+    }
+  }
+}
+
+void loop() {
+  // Read the state of each IR sensor
+  irSensorState1 = digitalRead(irSensorPin1);  
+  irSensorState2 = digitalRead(irSensorPin2);  
+  irSensorState3 = digitalRead(irSensorPin3);  
+  irSensorState4 = digitalRead(irSensorPin4);  
+  
+  // Update parking slot status based on IR sensors
+  slotOccupied[0] = (irSensorState1 == LOW);
+  slotOccupied[1] = (irSensorState2 == LOW);
+  slotOccupied[2] = (irSensorState3 == LOW);
+  slotOccupied[3] = (irSensorState4 == LOW);
+  
+  // Check for RFID card presence
+  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+    // Retrieve UID
+    byte uid[4];
+    for (byte i = 0; i < 4; i++) {
+      uid[i] = rfid.uid.uidByte[i];
+    }
+    
+    // Search for the vehicle number based on the UID
+    String vehicleNumber = "";
+    for (int i = 0; i < MAX_VEHICLES; i++) {
+      bool match = true;
+      for (int j = 0; j < 4; j++) {
+        if (vehicles[i].uid[j] != uid[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        vehicleNumber = vehicles[i].vehicleNumber;
+        break;
+      }
+    }
+    
+    // Check if vehicle is registered
+    if (vehicleNumber != "") {
+      int parkedSlot = -1;
+      for (int i = 0; i < 4; i++) {
+        if (parkedVehicles[i] == vehicleNumber) {
+          parkedSlot = i;
+          break;
+        }
+      }
+
+      if (parkedSlot == -1) {
+        // Vehicle is entering, find a free slot
+        int freeSlot = -1;
+        for (int i = 0; i < 4; i++) {
+          if (!slotOccupied[i]) {
+            freeSlot = i;
+            break;
+          }
+        }
+
+        if (freeSlot != -1) {
+          // If free slot is found, mark slot as occupied
+          slotOccupied[freeSlot] = true;
+          parkedVehicles[freeSlot] = vehicleNumber;
+          Serial.print(vehicleNumber);
+          Serial.print(" entered. Park in slot ");
+          Serial.println(freeSlot + 1);
+
+          lcd.clear();
+          scrollText(vehicleNumber + " entered", 0);
+          lcd.setCursor(0, 1);
+          lcd.print("Park in slot " + String(freeSlot + 1));
+        } else {
+          // If no free slot, notify the user
+          Serial.println("Slots are Full, Wait for some time");
+
+          lcd.clear();
+          scrollText("Slots are Full", 0);
+          lcd.setCursor(0, 1);
+          lcd.print("Wait for a slot");
+        }
+      } else {
+        // Vehicle is exiting
+        slotOccupied[parkedSlot] = false;
+        Serial.print(vehicleNumber);
+        Serial.print(" exited. Slot ");
+        Serial.print(parkedSlot + 1);
+        Serial.println(" is free now");
+
+        lcd.clear();
+        scrollText(vehicleNumber + " exited", 0);
+        lcd.setCursor(0, 1);
+        lcd.print("Slot " + String(parkedSlot + 1) + " is free");
+        parkedVehicles[parkedSlot] = "";  // Free the slot
+      }
+    } else {
+      Serial.println("Unknown vehicle.");
+
+      lcd.clear();
+      scrollText("Unknown vehicle", 0);
+    }
+
+    // Halt the RFID reader to read the next card
+    rfid.PICC_HaltA();
+  }
+
+  // Delay for a short period before reading again
+  delay(1000);  // Delay for 1 second
+}
