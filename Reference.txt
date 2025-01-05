@@ -28,7 +28,7 @@ For Power Supply Notes
 - The Arduino Uno’s 5V pin can be used to power the IR sensors and LCD.
 - The 3.3V pin on the Arduino is used to power the RFID reader.
   
-Connection Diagram
+Connection Diagram for STM32
 
 Here is the wiring summary:
 - D2: IR Sensor 1 OUT.
